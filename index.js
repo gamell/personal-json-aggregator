@@ -2,6 +2,7 @@ const axios = require('axios');
 const ghPinnedRepos = require('./gh-pinned-repos.js');
 const rssParser = require('rss-parser');
 const striptags = require('striptags');
+const truncate = require('truncate-html');
 
 const pictureUrl = `https://api.500px.com/v1/photos?feature=user&username=gamell&sort=created_at&image_size=4&consumer_key=cdpKv8cJK8u78zzqd8WdUUlRGx1In8k0pDrviX62`;
 const articlesUrl = `https://medium.com/feed/@gamell`
@@ -24,10 +25,14 @@ function parseFeed(feed){
 
 function trimFeed(data){
   return data.feed.entries.map(e => {
+    let content = striptags(e['content:encoded'], ['b', 'strong', 'i', 'em', 'img'], ' ');
+    content = truncate(content, 50, {byWords: true});
     return {
+      link: e.link,
       title: e.title,
       date: e.pubDate,
-      content: striptags(e['content:encoded'], ['b', 'strong', 'i', 'em'], ' ').substring(0,500)
+      categories: e.categories,
+      content: content
     }
   })
   return feed;

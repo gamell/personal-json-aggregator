@@ -1,0 +1,25 @@
+{
+  "name": "personal-json-aggregator",
+  "version": "1.0.0",
+  "description": "Small function to aggregate and cache information from different sources for my personal website",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gamell/personal-json-aggregator.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/gamell/personal-json-aggregator/issues"
+  },
+  "homepage": "https://github.com/gamell/personal-json-aggregator#readme",
+  "dependencies": {
+    "aimer": "^1.3.0",
+    "axios": "^0.16.1",
+    "rss-parser": "^2.7.0"
+  }
+}

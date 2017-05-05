@@ -21,6 +21,11 @@ function parseFeed(feed){
   });
 }
 
+function trimFeed(feed){
+  // todo
+  return feed;
+}
+
 exports.handler = (event, context, callback) => {
     const pictures = axios.get(pictureUrl).then(res => trimPictureInfo(res.data));
     const articles = axios.get(articlesUrl).then(res => parseFeed(res.data)).then(feed => trimFeed(feed));

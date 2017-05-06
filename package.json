@@ -4,7 +4,8 @@
   "description": "Small function to aggregate and cache information from different sources for my personal website",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node run.js",
+    "run": "node run.js"
   },
   "repository": {
     "type": "git",
@@ -25,7 +26,10 @@
     "truncate-html": "^0.1.4"
   },
   "devDependencies": {
+    "del": "^2.2.2",
     "gulp": "^3.9.1",
+    "gulp-shell": "^0.6.3",
+    "gulp-tap": "^1.0.1",
     "gulp-zip": "^4.0.0"
   }
 }

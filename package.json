@@ -23,5 +23,9 @@
     "rss-parser": "^2.7.0",
     "striptags": "^3.0.1",
     "truncate-html": "^0.1.4"
+  },
+  "devDependencies": {
+    "gulp": "^3.9.1",
+    "gulp-zip": "^4.0.0"
   }
 }

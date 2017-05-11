@@ -21,6 +21,7 @@ const pictureUrl = `https://api.500px.com/v1/photos?feature=user&username=gamell
 const articlesUrl = `https://medium.com/feed/@gamell`
 
 if(env !== 'prod'){ // load credentials if in development
+  console.log('using local credentials');
   const awsCredentials = new aws.SharedIniFileCredentials({profile: 'default'});
   aws.config.credentials = awsCredentials;
 }
@@ -35,7 +36,7 @@ function parseFeed(feed){
   return new Promise((resolve, reject) => {
     rssParser.parseString(feed, (error, data) => {
       if(error) reject(error);
-      resolve(data);
+      else resolve(data);
     });
   });
 }
@@ -66,7 +67,7 @@ function uploadToS3(data){
         ACL: 'public-read'
     }, (err, data) => {
       if (err) reject(err);
-      resolve(data);
+      else resolve(data);
     });
   })
 }
@@ -99,7 +100,7 @@ exports.handler = (event, context, callback) => {
       return uploadToS3(gzipped).then(callback(null, 'success - changes uploaded to S3'));
     }).catch(reason => {
       console.log(`ERROR!!! ${reason}`);
-      callback(`ERROR!!! ${reason}`);
+      callback(`ERROR!!! ${reason}`, null);
     })
 
 };

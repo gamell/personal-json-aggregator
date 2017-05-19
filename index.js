@@ -28,7 +28,7 @@ if(env !== 'prod'){ // load credentials if in development
 
 function trimPictureInfo(data){
   return data.photos.map(i => {
-    return {id: i.id, name: i.name, imageUrl: i.image_url}
+    return {id: i.id, name: i.name, imageUrl: i.image_url, url: `https://500px.com${i.url}`}
   });
 }
 

@@ -35,7 +35,7 @@ function trimPictureInfo(data){
 function parseFeed(feed){
   return new Promise((resolve, reject) => {
     rssParser.parseString(feed, (error, data) => {
-      if(error) reject(error);
+      if(error) reject(`Parse Feed Failed: ${error}`);
       else resolve(data);
     });
   });
@@ -66,14 +66,14 @@ function uploadToS3(data){
         ContentEncoding: 'gzip',
         ACL: 'public-read'
     }, (err, data) => {
-      if (err) reject(err);
+      if (err) reject(`Upload to S3 failed: ${err}`);
       else resolve(data);
     });
   })
 }
 
 exports.handler = (event, context, callback) => {
-    const old = axios.get(jsonUrl).then(res => res.data).catch(err => new Object());
+    const old = axios.get(jsonUrl).then(res => res.data).catch(() => ({}));
     const pictures = axios.get(pictureUrl).then(res => trimPictureInfo(res.data));
     const articles = axios.get(articlesUrl).then(res => parseFeed(res.data)).then(data => trimFeed(data));
     const repos = ghPinnedRepos.get('gamell');

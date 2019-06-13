@@ -1,31 +1,30 @@
 /* form https://github.com/egoist/gh-pinned-repos/blob/master/index.js */
 
-const aimer = require('aimer')
+const axios = require('axios');
+const cheerio = require('cheerio');
 
 exports.get = function(username) {
-  return aimer(`https://github.com/${username}`)
-    .then($ => {
-      const pinned = $('.pinned-repo-item.public')
-      if (!pinned || pinned.length === 0) return []
-
-      const result = []
-      pinned.each((index, item) => {
-        let language = $(item).find('p.mb-0').contents().get(2)
-        language = language && language.data.trim()
-
-        let owner = $(item).find('.owner').text().trim()
-        owner = owner || username
-
-        const forks = $(item).find('a[href$="/network"]').text().trim()
-        result[index] = {
-          repo: $(item).find('.repo').text(),
-          owner,
-          description: $(item).find('.pinned-repo-desc').html().trim(),
-          language: language || undefined,
-          stars: $(item).find('a[href$="/stargazers"]').text().trim(),
-          forks: forks ? forks : 0
+  return axios.get(`https://github.com/${username}`)
+    .then((response) => cheerio.load(response.data)).then(($) => {
+      const pinned = $('.pinned-items-list li');
+      if (!pinned || pinned.length === 0) return [];
+ 
+      const results = Array.from(pinned).map(item => {
+        const language = $(item).find('span[itemprop="programmingLanguage"]').text().trim();
+        const forks = $(item).find('a[href*="network/members"]').text().trim();
+        const stars = $(item).find('a[href*="stargazers"]').text().trim();
+        const description = $(item).find('.pinned-item-desc').text().trim();
+        const name = $(item).find('span.js-pinnable-item').text().trim();
+        const link = `https://github.com${$(item).find('.pinned-item-list-item-content a.text-bold').attr('href').trim()}`;
+        return {
+          name,
+          description,
+          stars,
+          forks,
+          link,
+          language,
         }
       })
-      return result
+      return results;
     })
 }

@@ -1,9 +1,8 @@
 const axios = require('axios');
 const ghPinnedRepos = require('./gh-pinned-repos.js');
-const rssParser = require('rss-parser');
-const striptags = require('striptags');
+const Parser = require('rss-parser');
+const parser = new Parser();const striptags = require('striptags');
 const truncate = require('truncate-html');
-const gzip = require('gzip-js');
 const pako = require('pako');
 const _ = require('lodash');
 
@@ -17,7 +16,7 @@ const s3 = new aws.S3();
 const env = process.env.ENVIRONMENT || 'local';
 
 const jsonUrl = 'https://s3.amazonaws.com/gamell-io/data.json';
-const pictureUrl = `https://api.500px.com/v1/photos?feature=user&username=gamell&sort=created_at&image_size=4&consumer_key=cdpKv8cJK8u78zzqd8WdUUlRGx1In8k0pDrviX62`;
+const pictureUrl = `https://api.instagram.com/v1/users/266723690/media/recent?access_token=266723690.addbc4f.c1318ffb2119436d9cd38323fb93cb0c&count=10`;
 const articlesUrl = `https://medium.com/feed/@gamell`
 
 if(env !== 'prod'){ // load credentials if in development
@@ -27,22 +26,13 @@ if(env !== 'prod'){ // load credentials if in development
 }
 
 function trimPictureInfo(data){
-  return data.photos.map(i => {
-    return {id: i.id, name: i.name, imageUrl: i.image_url, url: `https://500px.com${i.url}`}
-  });
-}
-
-function parseFeed(feed){
-  return new Promise((resolve, reject) => {
-    rssParser.parseString(feed, (error, data) => {
-      if(error) reject(error);
-      else resolve(data);
-    });
+  return data.data.map(i => {
+    return { id: i.id, caption: i.caption.text, imageUrl: i.images.standard_resolution.url, url: i.link }
   });
 }
 
 function trimFeed(data){
-  return data.feed.entries.map(e => {
+  return data.items.map(e => {
     let content = striptags(e['content:encoded'], ['b', 'strong', 'i', 'em', 'img'], '');
     content = truncate(content, 50, {byWords: true});
     return {
@@ -66,16 +56,16 @@ function uploadToS3(data){
         ContentEncoding: 'gzip',
         ACL: 'public-read'
     }, (err, data) => {
-      if (err) reject(err);
+      if (err) reject(`Upload to S3 failed: ${err}`);
       else resolve(data);
     });
   })
 }
 
 exports.handler = (event, context, callback) => {
-    const old = axios.get(jsonUrl).then(res => res.data).catch(err => new Object());
+    const old = axios.get(jsonUrl).then(res => res.data).catch(() => ({}));
     const pictures = axios.get(pictureUrl).then(res => trimPictureInfo(res.data));
-    const articles = axios.get(articlesUrl).then(res => parseFeed(res.data)).then(data => trimFeed(data));
+    const articles = parser.parseURL(articlesUrl).then(data => trimFeed(data));
     const repos = ghPinnedRepos.get('gamell');
 
     Promise.all([pictures, articles, repos, old]).then(res => {
@@ -92,14 +82,14 @@ exports.handler = (event, context, callback) => {
       }
       const json = JSON.stringify({
         name: '@gamell',
-        contents: '500px user feed, Medium articles, Github pinned repos',
+        contents: 'Instagram pictures, Medium articles, Github pinned repos',
         timestamp: new Date(),
         data
       }, null, 2);
       const gzipped = Buffer.from(pako.gzip(json), 'utf-8');
       return uploadToS3(gzipped).then(callback(null, 'success - changes uploaded to S3'));
     }).catch(reason => {
-      console.log(`ERROR!!! ${reason}`);
+      console.log(`ERROR!!! ${reason} \n\n ${reason.stack}`);
       callback(`ERROR!!! ${reason}`, null);
     })
 

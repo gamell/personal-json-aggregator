@@ -5,6 +5,7 @@ const parser = new Parser();const striptags = require('striptags');
 const truncate = require('truncate-html');
 const pako = require('pako');
 const _ = require('lodash');
+const { instagramToken } = require('./.keys.json');
 
 // AWS stuff
 
@@ -16,7 +17,7 @@ const s3 = new aws.S3();
 const env = process.env.ENVIRONMENT || 'local';
 
 const jsonUrl = 'https://s3.amazonaws.com/gamell-io/data.json';
-const pictureUrl = `https://api.instagram.com/v1/users/266723690/media/recent?access_token=266723690.addbc4f.c1318ffb2119436d9cd38323fb93cb0c&count=10`;
+const pictureUrl = `https://api.instagram.com/v1/users/266723690/media/recent?access_token=${instagramToken}&count=10`;
 const articlesUrl = `https://medium.com/feed/@gamell`
 
 if(env !== 'prod'){ // load credentials if in development
@@ -42,7 +43,7 @@ function trimFeed(data){
       categories: e.categories,
       content: content
     }
-  });
+  }).filter(e => Array.isArray(e.categories));
 }
 
 function uploadToS3(data){
@@ -56,14 +57,14 @@ function uploadToS3(data){
         ContentEncoding: 'gzip',
         ACL: 'public-read'
     }, (err, data) => {
-      if (err) reject(`Upload to S3 failed: ${err}`);
+      if (err) reject(`Upload to S3 failed: ${err} \n\n STATCK \n\n ${err.stack}`);
       else resolve(data);
     });
   })
 }
 
 exports.handler = (event, context, callback) => {
-    const old = axios.get(jsonUrl).then(res => res.data).catch(() => ({}));
+    const old = axios.get(jsonUrl).then(res => res.data);
     const pictures = axios.get(pictureUrl).then(res => trimPictureInfo(res.data));
     const articles = parser.parseURL(articlesUrl).then(data => trimFeed(data));
     const repos = ghPinnedRepos.get('gamell');
@@ -90,7 +91,7 @@ exports.handler = (event, context, callback) => {
       return uploadToS3(gzipped).then(callback(null, 'success - changes uploaded to S3'));
     }).catch(reason => {
       console.log(`ERROR!!! ${reason} \n\n ${reason.stack}`);
-      callback(`ERROR!!! ${reason}`, null);
+      callback(`ERROR!!! ${reason} \n\n STACK: \n\n ${reason.stack}`, null);
     })
 
 };

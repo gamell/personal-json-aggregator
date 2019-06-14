@@ -1,12 +1,18 @@
 const gulp = require('gulp');
+const { src, dest } = require('gulp');
 const zip = require('gulp-zip');
 const del = require('del');
-const shell = require('gulp-shell');
+const shell = require('shelljs');
 const tap = require('gulp-tap');
+const pjson = require('./package.json');
 
-gulp.task('build:prepare', ['clean:fast'], () =>
-  // copy only what we need for deployment
-  gulp.src([
+function clean(cb){
+  del(['build/**', '!build', 'build/dist/**', '!build/dist']);
+  return cb();
+};
+
+function copy() {
+  return src([
     '**/*',
     '!node_modules/**',
     '!build',
@@ -14,34 +20,26 @@ gulp.task('build:prepare', ['clean:fast'], () =>
     '!gulpfile.js',
     '!run.js'
   ])
-  .pipe(gulp.dest('build/dist/'))
-);
+  .pipe(dest('build/dist/'));
+};
 
-// will no install any devDependencies
-gulp.task('build:install', ['build:prepare'], shell.task('npm install --production', {cwd: './build/dist'}));
+function npmInstall(cb) {
+  shell.cd('./build/dist');
+  // production to prevent installing dev dependencies
+  shell.exec('npm install --production');
+  shell.cd('../..');
+  cb();
+};
 
-gulp.task('zip', ['build:install'], () => {
-  const buildArtifact = ['build/dist/**'];
-  const pjson = require('./package.json');
-  const zipFile = pjson.name + '.zip';
-  return gulp.src(buildArtifact, {base: './build/dist'})
-        .pipe(tap(file => {
-          if (file.isDirectory()) {
-            file.stat.mode = parseInt('40777', 8);
-          }
-        }))
-        .pipe(zip(zipFile))
-        .pipe(gulp.dest('build'));
-});
+function zipit(cb) {
+    return src('build/dist/**').pipe(tap(file => {
+            if (file.isDirectory()) {
+              file.stat.mode = parseInt('40777', 8);
+            }
+            return file;
+          }))
+          .pipe(zip(`${pjson.name}.zip`))
+          .pipe(dest('build'));
+};
 
-gulp.task('clean:fast', () => {
-  // delete everything except the already downloaded npm modules, to make the build faster
-  return del(['build/**', '!build', 'build/dist/**', '!build/dist', '!build/dist/node_modules', '!build/dist/node_modules/**']);
-});
-
-gulp.task('clean', () => {
-  return del(['build/']);
-});
-
-gulp.task('dist', ['zip']);
-gulp.task('default', ['dist']);
+exports.build = gulp.series(clean, copy, npmInstall, zipit);

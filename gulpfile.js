@@ -14,6 +14,7 @@ function clean(cb){
 function copy() {
   return src([
     '**/*',
+    '**/.*',
     '!node_modules/**',
     '!build',
     '!build/**',
@@ -32,7 +33,7 @@ function npmInstall(cb) {
 };
 
 function zipit(cb) {
-    return src('build/dist/**').pipe(tap(file => {
+    return src(['build/dist/**', 'build/dist/.*']).pipe(tap(file => {
             if (file.isDirectory()) {
               file.stat.mode = parseInt('40777', 8);
             }

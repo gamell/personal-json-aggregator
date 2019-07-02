@@ -6,6 +6,7 @@ const truncate = require('truncate-html');
 const pako = require('pako');
 const _ = require('lodash');
 const { instagramToken } = require('./.keys.json');
+const personalInformation = require('./personal-info.json');
 
 // AWS stuff
 
@@ -71,7 +72,7 @@ exports.handler = (event, context, callback) => {
 
     Promise.all([pictures, articles, repos, old]).then(res => {
       const [pictures, articles, repos, old] = res;
-      const data = { pictures, articles, repos };
+      const data = { pictures, articles, repos, personalInformation };
       if (!old.data) {
         console.log('WARNING: Old data not available');
         old.data = { pictures: [], articles: [], repos: [] };

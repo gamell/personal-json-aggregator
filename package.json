@@ -23,7 +23,7 @@
     "axios": "^0.19.0",
     "cheerio": "^1.0.0-rc.3",
     "pako": "^1.0.10",
-    "lodash": "^4.17.11",
+    "lodash": "^4.17.13",
     "rss-parser": "^3.7.1",
     "striptags": "^3.1.1",
     "truncate-html": "^1.0.2"

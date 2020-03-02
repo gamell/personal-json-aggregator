@@ -26,7 +26,7 @@
     "pako": "^1.0.10",
     "rss-parser": "^3.7.1",
     "striptags": "^3.1.1",
-    "truncate-html": "^1.0.2"
+    "truncate-html": "^1.0.3"
   },
   "devDependencies": {
     "del": "^4.1.1",

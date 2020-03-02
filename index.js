@@ -108,7 +108,12 @@ exports.handler = (event, context, callback) => {
 
   Promise.all([pictures, articles, repos, old])
     .then(res => {
-      const [pictures, articles, repos, old] = res;
+      const [
+        pictures,
+        articles,
+        { results: repos, errors: reposErrors },
+        old
+      ] = res;
       if (!old.data) {
         console.log("WARNING: Old data not available");
         old.data = { pictures: [], articles: [], repos: [] };
@@ -125,7 +130,7 @@ exports.handler = (event, context, callback) => {
 
       const errors = res.reduce(
         (acc, curr) => (curr && curr.error ? [...acc, curr.error] : acc),
-        []
+        reposErrors
       );
 
       if (errors.length > 0) {

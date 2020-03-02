@@ -20,31 +20,41 @@ exports.get = function(username) {
       if (!pinned || pinned.length === 0)
         throw Error(`Couldn't get Github pinned repos!`);
 
+      const errors = [];
+
       const results = Array.from(pinned).map(item => {
         const language = $(item)
           .find('span[itemprop="programmingLanguage"]')
           .text()
           .trim();
+        if (!language) errors.push(Error(`Couldn't get Github repo language!`));
         const forks = $(item)
           .find('a[href*="network/members"]')
           .text()
           .trim();
+        if (!forks) errors.push(Error(`Couldn't get Github repo forks!`));
         const stars = $(item)
           .find('a[href*="stargazers"]')
           .text()
           .trim();
+        if (!stars) errors.push(Error(`Couldn't get Github repo stars!`));
         const description = $(item)
           .find(".pinned-item-desc")
           .text()
           .trim();
+        if (!description)
+          errors.push(Error(`Couldn't get Github repo description!`));
         const name = $(item)
-          .find("span.js-pinnable-item")
+          .find("a")
+          .first()
           .text()
           .trim();
+        if (!name) errors.push(Error(`Couldn't get Github repo name!`));
         const link = `https://github.com${$(item)
           .find(".pinned-item-list-item-content a.text-bold")
           .attr("href")
           .trim()}`;
+        if (!link) errors.push(Error(`Couldn't get Github repo link!`));
         return {
           name,
           description,
@@ -54,6 +64,6 @@ exports.get = function(username) {
           language
         };
       });
-      return results;
+      return { results, errors };
     });
 };

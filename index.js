@@ -8,6 +8,7 @@ const pako = require("pako");
 const _ = require("lodash");
 const { instagramToken } = require("./.keys.json");
 const personalInformation = require("./personal-info.json");
+const { extract } = require("oembed-parser");
 
 // AWS stuff
 
@@ -26,25 +27,25 @@ if (env !== "prod") {
   // load credentials if in development
   console.log("using local credentials");
   const awsCredentials = new aws.SharedIniFileCredentials({
-    profile: "default"
+    profile: "default",
   });
   aws.config.credentials = awsCredentials;
 }
 
 function trimPictureInfo(data) {
-  return data.data.map(i => {
+  return data.data.map((i) => {
     return {
       id: i.id,
       caption: i.caption.text,
       imageUrl: i.images.standard_resolution.url,
-      url: i.link
+      url: i.link,
     };
   });
 }
 
 function trimFeed(data) {
   return data.items
-    .map(e => {
+    .map((e) => {
       let content = striptags(
         e["content:encoded"],
         ["b", "strong", "i", "em", "img"],
@@ -56,10 +57,10 @@ function trimFeed(data) {
         title: e.title,
         date: e.pubDate,
         categories: e.categories,
-        content: content
+        content: content,
       };
     })
-    .filter(e => Array.isArray(e.categories));
+    .filter((e) => Array.isArray(e.categories));
 }
 
 function uploadToS3(data) {
@@ -72,7 +73,7 @@ function uploadToS3(data) {
         ContentType: "application/json; charset=utf-8",
         CacheControl: "max-age=86400",
         ContentEncoding: "gzip",
-        ACL: "public-read"
+        ACL: "public-read",
       },
       (err, data) => {
         if (err)
@@ -86,33 +87,33 @@ function uploadToS3(data) {
 exports.handler = (event, context, callback) => {
   const old = axios
     .get(jsonUrl)
-    .then(res => res.data)
-    .catch(reason => ({
-      error: `Error while trying to get the old JSON file: ${reason}`
+    .then((res) => res.data)
+    .catch((reason) => ({
+      error: `Error while trying to get the old JSON file: ${reason}`,
     }));
   const pictures = axios
     .get(pictureUrl)
-    .then(res => trimPictureInfo(res.data))
-    .catch(reason => ({
-      error: `Error while trying to get the pictures data: ${reason}`
+    .then((res) => trimPictureInfo(res.data))
+    .catch((reason) => ({
+      error: `Error while trying to get the pictures data: ${reason}`,
     }));
   const articles = parser
     .parseURL(articlesUrl)
-    .then(data => trimFeed(data))
-    .catch(reason => ({
-      error: `Error while trying to get the articles data: ${reason}`
+    .then((data) => trimFeed(data))
+    .catch((reason) => ({
+      error: `Error while trying to get the articles data: ${reason}`,
     }));
-  const repos = ghPinnedRepos.get("gamell").catch(reason => ({
-    error: `Error while trying to get the repos data: ${reason}`
+  const repos = ghPinnedRepos.get("gamell").catch((reason) => ({
+    error: `Error while trying to get the repos data: ${reason}`,
   }));
 
   Promise.all([pictures, articles, repos, old])
-    .then(res => {
+    .then((res) => {
       const [
         pictures,
         articles,
         { results: repos, errors: reposErrors },
-        old
+        old,
       ] = res;
       if (!old.data) {
         console.log("WARNING: Old data not available");
@@ -125,7 +126,7 @@ exports.handler = (event, context, callback) => {
         repos: repos.error ? old.repos : repos,
         personalInformation: personalInformation.error
           ? old.personalInformation
-          : personalInformation
+          : personalInformation,
       };
 
       const errors = res.reduce(
@@ -149,7 +150,7 @@ exports.handler = (event, context, callback) => {
           name: "@gamell",
           contents: "Instagram pictures, Medium articles, Github pinned repos",
           timestamp: new Date(),
-          data
+          data,
         },
         null,
         2
@@ -163,7 +164,7 @@ exports.handler = (event, context, callback) => {
           : callback(null, "success - changes uploaded to S3")
       );
     })
-    .catch(reason => {
+    .catch((reason) => {
       callback(`ERROR!!! ${reason} \n\n STACK: \n\n ${reason.stack}`, null);
     });
 };

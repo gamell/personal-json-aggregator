@@ -6,9 +6,12 @@ const striptags = require("striptags");
 const truncate = require("truncate-html");
 const pako = require("pako");
 const _ = require("lodash");
-const { instagramToken } = require("./.keys.json");
+const { instagramToken, opengraphIoAppIds } = require("./.keys.json");
 const personalInformation = require("./personal-info.json");
-const { extract } = require("oembed-parser");
+const opengraph = require("opengraph-io")({
+  appId: opengraphIoAppIds[1],
+  cacheOk: true,
+});
 
 // AWS stuff
 
@@ -20,8 +23,12 @@ const s3 = new aws.S3();
 const env = process.env.ENVIRONMENT || "local";
 
 const jsonUrl = "https://s3.amazonaws.com/gamell-io/data.json";
-const pictureUrl = `https://api.instagram.com/v1/users/266723690/media/recent?access_token=${instagramToken}&count=10`;
+const pictureUrl = `https://graph.instagram.com/17841401070704167/media?fields=caption,permalink,media_url&access_token=${instagramToken}`;
 const articlesUrl = `https://medium.com/feed/@gamell`;
+
+function log(str, level = "dev") {
+  console.log(str);
+}
 
 if (env !== "prod") {
   // load credentials if in development
@@ -33,17 +40,21 @@ if (env !== "prod") {
 }
 
 function trimPictureInfo(data) {
-  return data.data.map((i) => {
-    return {
-      id: i.id,
-      caption: i.caption.text,
-      imageUrl: i.images.standard_resolution.url,
-      url: i.link,
-    };
-  });
+  log("Trimming picture info");
+  return data.data
+    .map((i) => {
+      return {
+        id: i.id,
+        caption: i.caption,
+        imageUrl: i.media_url,
+        url: i.permalink,
+      };
+    })
+    .slice(0, 18);
 }
 
 function trimFeed(data) {
+  log("Trimming RSS feed");
   return data.items
     .map((e) => {
       let content = striptags(
@@ -64,6 +75,7 @@ function trimFeed(data) {
 }
 
 function uploadToS3(data) {
+  log("Uploading to AWS S3");
   return new Promise((resolve, reject) => {
     s3.putObject(
       {
@@ -85,6 +97,7 @@ function uploadToS3(data) {
 }
 
 exports.handler = (event, context, callback) => {
+  log("Starting process");
   const old = axios
     .get(jsonUrl)
     .then((res) => res.data)
@@ -97,18 +110,45 @@ exports.handler = (event, context, callback) => {
     .catch((reason) => ({
       error: `Error while trying to get the pictures data: ${reason}`,
     }));
-  const articles = parser
-    .parseURL(articlesUrl)
-    .then((data) => trimFeed(data))
-    .catch((reason) => ({
-      error: `Error while trying to get the articles data: ${reason}`,
-    }));
+  const articles = old.then((old = { data: { articles: [] } }) =>
+    parser
+      .parseURL(articlesUrl)
+      .catch((reason) => ({
+        error: `Error while fetching the articles' feed: ${reason}`,
+      }))
+      .then((data) => trimFeed(data))
+      .catch((reason) => ({
+        error: `Error while trying trimming articles' data: ${reason}`,
+      }))
+      .then((articles) => {
+        const oldArticles = old.data.articles || [];
+        const oldHashTable = {};
+        oldArticles.forEach((a) => (oldHashTable[a.title] = a));
+        return Promise.all(
+          articles.map((a) => {
+            maybeOldArticle = oldHashTable[a.title];
+            if (!maybeOldArticle) {
+              log("New article found! Fetching metadata from opengraph-io");
+              return opengraph.getSiteInfo(a.link).then((embedInfo) => ({
+                ...a,
+                embedInfo,
+              }));
+            }
+            log("Old article found, not fetching metadata from opengraph-io");
+            return maybeOldArticle;
+          })
+        ).catch((reason) => ({
+          error: `Error while fetching articles' embed data: ${reason}`,
+        }));
+      })
+  );
   const repos = ghPinnedRepos.get("gamell").catch((reason) => ({
     error: `Error while trying to get the repos data: ${reason}`,
   }));
 
   Promise.all([pictures, articles, repos, old])
     .then((res) => {
+      log("All promises resolved");
       const [
         pictures,
         articles,
@@ -138,6 +178,7 @@ exports.handler = (event, context, callback) => {
         console.log(
           "There have been some errors but will continue building JSON file with available information"
         );
+        errors.forEach((error) => console.error(error));
       }
 
       if (JSON.stringify(old.data) === JSON.stringify(data)) {

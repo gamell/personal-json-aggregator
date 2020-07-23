@@ -1,6 +1,8 @@
 const app = require("./index.js");
 
-app.handler("bla", "bla", function(err, success) {
+const context = process.argv[2] || "";
+console.log(context);
+app.handler("bla", context, function (err, success) {
   if (success) {
     console.log(success);
   }

@@ -7,9 +7,9 @@ const truncate = require("truncate-html");
 const pako = require("pako");
 const _ = require("lodash");
 const { instagramToken, opengraphIoAppIds } = require("./.keys.json");
-const personalInformation = require("./personal-info.json");
-const MarkdownIt = require("markdown-it");
-const md = new MarkdownIt();
+const md = require("markdown-it")({
+  html: true,
+});
 const hash = require("object-hash");
 const opengraphIdToUse =
   opengraphIoAppIds[Math.floor(Math.random() * opengraphIoAppIds.length)];
@@ -222,9 +222,6 @@ exports.handler = (event, context, callback) => {
         pictures: pictures.error ? old.pictures : pictures,
         articles: articles.error ? old.articles : articles,
         repos: repos.error ? old.repos : repos,
-        personalInformation: personalInformation.error
-          ? old.personalInformation
-          : personalInformation,
       };
 
       const flattenedMarkdowns = markdownsArr.reduce(

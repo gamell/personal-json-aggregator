@@ -68,8 +68,6 @@ function trimPictureInfo(data) {
     .slice(0, 18);
 }
 
-function fetchMarkdowns() {}
-
 function trimFeed(data, source) {
   log("Trimming RSS feed");
   const result = data.items.map((e) => {
@@ -169,34 +167,58 @@ function generateHash(article) {
   return hash([article.title, article.description]);
 }
 
+let markdownHashes = {};
+
 exports.handler = (event, context, callback) => {
   log("Starting process");
+  log("Fetching old info");
   const old = axios
     .get(jsonUrl)
     .then((res) => res.data)
     .catch((reason) => ({
       error: `Error while trying to get the old JSON file: ${reason}`,
     }));
+  log("Fetching picture info");
   const pictures = axios
     .get(pictureUrl)
     .then((res) => trimPictureInfo(res.data))
     .catch((reason) => ({
       error: `Error while trying to get the pictures data: ${reason}`,
     }));
+  log("Fetching articles info");
   const articles = old.then((old = { data: { articles: [] } }) =>
     fetchArticles(old)
   );
+  log("Fetching repos info");
   const repos = ghPinnedRepos.get("gamell").catch((reason) => ({
     error: `Error while trying to get the repos data: ${reason}`,
   }));
+  log("Fetching markdowns info");
   const markdowns = Object.entries(markdownUrls).map(([name, url]) =>
     axios
       .get(url)
       .then((res) => {
-        console.log(`Processing Markdown ${url}: ${res.data}`);
+        console.log(`Processing Markdown ${url}`);
         return res;
       })
-      .then((res) => ({ [name]: md.render(res.data) })) // Render the markdown into HTML
+      .then((res) =>
+        old.then((old = { markdowns: {} }) => {
+          const currHash = hash(res.data);
+          const oldHash =
+            old.markdowns && old.markdowns.hashes && old.markdowns.hashes[name];
+          markdownHashes = { ...markdownHashes, [name]: currHash };
+          if (currHash === oldHash) {
+            log(
+              `Returning old markdown content for ${name} as it hasn't changed`
+            );
+            return { [name]: old.markdowns[name] };
+          } else {
+            return {
+              [name]: md.render(res.data),
+            };
+          }
+        })
+      ) // Render the markdown into HTML
       .catch((reason) => ({
         error: `Error while trying to get content from ${url}: \n\n ${reason}`,
       }))
@@ -228,7 +250,13 @@ exports.handler = (event, context, callback) => {
         (acc, curr) => ({ ...acc, ...curr }),
         {}
       ); // "flatten" the several object into one
-      const markdowns = markdownsArr.error ? old.markdowns : flattenedMarkdowns;
+      const flattenedMarkdownsWithHashes = {
+        ...flattenedMarkdowns,
+        hashes: markdownHashes,
+      };
+      const markdowns = markdownsArr.error
+        ? old.markdowns
+        : flattenedMarkdownsWithHashes;
 
       const errors = res.reduce(
         (acc, curr) => (curr && curr.error ? [...acc, curr.error] : acc),

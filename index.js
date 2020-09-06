@@ -241,9 +241,18 @@ exports.handler = (event, context, callback) => {
       }
       // fail gracefully and try to conserve whatever we have here in case some service starts erroring out
       const data = {
-        pictures: pictures.error ? old.pictures : pictures,
-        articles: articles.error ? old.articles : articles,
-        repos: repos.error ? old.repos : repos,
+        pictures:
+          !pictures || pictures.error || !Array.isArray(pictures)
+            ? old.data.pictures
+            : pictures,
+        articles:
+          !articles || articles.error || !Array.isArray(articles)
+            ? old.data.articles
+            : articles,
+        repos:
+          !repos || repos.error || !Array.isArray(repos)
+            ? old.data.repos
+            : repos,
       };
 
       const flattenedMarkdowns = markdownsArr.reduce(

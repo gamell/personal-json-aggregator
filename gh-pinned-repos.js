@@ -29,9 +29,7 @@ exports.get = function (username) {
           .trim();
         if (!language) errors.push(Error(`Couldn't get Github repo language!`));
         const forks = $(item).find('a[href*="network/members"]').text().trim();
-        if (!forks) errors.push(Error(`Couldn't get Github repo forks!`));
         const stars = $(item).find('a[href*="stargazers"]').text().trim();
-        if (!stars) errors.push(Error(`Couldn't get Github repo stars!`));
         const description = $(item).find(".pinned-item-desc").text().trim();
         if (!description)
           errors.push(Error(`Couldn't get Github repo description!`));

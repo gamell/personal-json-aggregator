@@ -21,15 +21,17 @@ const opengraph = require("opengraph-io")({
 
 // AWS stuff
 
-const aws = require("aws-sdk");
-const s3 = new aws.S3();
+// const aws = require("aws-sdk"),
+const { S3 } = require("@aws-sdk/client-s3");
+const { fromIni } = require("@aws-sdk/credential-providers");
+let s3;
 
 // environment
 
 const env = process.env.ENVIRONMENT || "local";
 
 const jsonUrl = "https://s3.amazonaws.com/gamell-io/data.json";
-const pictureUrl = `https://graph.instagram.com/17841401070704167/media?fields=caption,permalink,media_url&access_token=${instagramToken}`;
+const pictureUrl = `https://graph.instagram.com/v16.0/17841401070704167/media?fields=caption,permalink,media_url,media_type&access_token=${instagramToken}`;
 const mediumArticlesUrl = "https://medium.com/feed/@gamell";
 const gmsArticlesUrl = "https://graymatters.substack.com/feed";
 const markdownUrls = {
@@ -48,23 +50,28 @@ function log(str, level = "dev") {
 if (env !== "prod") {
   // load credentials if in development
   console.log("using local credentials");
-  const awsCredentials = new aws.SharedIniFileCredentials({
+  const awsCredentials = fromIni({
     profile: "default",
   });
-  aws.config.credentials = awsCredentials;
+  s3 = new S3({ credentials: awsCredentials });
+} else {
+  s3 = new S3();
 }
 
 function trimPictureInfo(data) {
   log("Trimming picture info");
   return data.data
-    .map((i) => {
-      return {
-        id: i.id,
-        caption: i.caption,
-        imageUrl: i.media_url,
-        url: i.permalink,
-      };
-    })
+    .reduce((acc, curr) => {
+      if (curr.media_type !== "VIDEO") {
+        acc.push({
+          id: curr.id,
+          caption: curr.caption,
+          imageUrl: curr.media_url,
+          url: curr.permalink,
+        });
+      }
+      return acc;
+    }, [])
     .slice(0, 18);
 }
 

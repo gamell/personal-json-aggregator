@@ -26,7 +26,7 @@ function copy() {
 function npmInstall(cb) {
   shell.cd("./build/dist");
   // production to prevent installing dev dependencies
-  shell.exec("npm install --production");
+  shell.exec("npm install --omit=dev");
   shell.cd("../..");
   cb();
 }

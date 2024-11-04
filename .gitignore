@@ -46,3 +46,7 @@ build/**
 # TypeScript
 *.tsbuildinfo
 dist/
+
+build
+bun.lockb
+build.zip

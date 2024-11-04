@@ -1,4 +1,4 @@
-import { S3, PutObjectCommandOutput } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, PutObjectCommandOutput } from "@aws-sdk/client-s3";
 import { fromIni } from "@aws-sdk/credential-providers";
 import axios from "axios";
 import MarkdownIt from "markdown-it";
@@ -9,8 +9,8 @@ import opengraphio from "opengraph-io";
 import striptags from "striptags";
 import truncateHtml from "truncate-html";
 import { getPinnedRepos } from "./gh-pinned-repos.js";
-import type { AggregatedData, Article, Picture, Repository, Config, Markdowns } from "./types.js";
-import { readFile } from 'fs/promises';
+import type { AggregatedData, Article, Picture, Config, Markdowns } from "./types.js";
+import { readFile, writeFile } from 'fs/promises';
 
 // Constants
 const jsonUrl = "https://s3.amazonaws.com/gamell-io/data.json";
@@ -31,7 +31,7 @@ const loadConfig = async (): Promise<Config> => {
   } catch (err) {
     return {
       instagramToken: process.env.INSTAGRAM_TOKEN || '',
-      opengraphIoAppIds: [process.env.OPENGRAPH_IO_APP_ID || '']
+      opengraphIoAppIds: [process.env.OPENGRAPH_IO_APP_ID_1 || '', process.env.OPENGRAPH_IO_APP_ID_2 || '', process.env.OPENGRAPH_IO_APP_ID_3 || '']
     };
   }
 };
@@ -42,10 +42,9 @@ const pictureUrl = `https://graph.instagram.com/v16.0/17841401070704167/media?fi
 const mediumArticlesUrl = "https://medium.com/feed/@gamell";
 const gmsArticlesUrl = "https://graymatters.substack.com/feed";
 
-const s3 = new S3({
-  region: "us-east-1",
-  credentials: env !== "prod" ? fromIni({ profile: "default" }) : undefined
-});
+console.log("Current environment:", env);
+const credentials = fromIni({ profile: "default" });
+console.log("Found credentials:", !!credentials);
 
 const parser = new Parser();
 const md = new MarkdownIt({ html: true });
@@ -80,7 +79,7 @@ interface ArticleError {
   error: string;
 }
 
-type ArticleResult = Article | ArticleError;
+type ArticleResult = Article[] | Article | ArticleError;
 
 function isArticleError(article: ArticleResult): article is ArticleError {
   return 'error' in article;
@@ -110,8 +109,12 @@ function trimFeed(data: any, source: string): Article[] {
 }
 
 async function uploadToS3(data: Buffer): Promise<PutObjectCommandOutput> {
+  const s3 = new S3Client({
+    region: "us-east-1",
+    credentials: env !== "prod" ? credentials : undefined
+  });
   try {
-    const result = await s3.putObject({
+    const result = await s3.send(new PutObjectCommand({
       Bucket: "gamell-io",
       Key: "data.json",
       Body: data,
@@ -119,11 +122,15 @@ async function uploadToS3(data: Buffer): Promise<PutObjectCommandOutput> {
       CacheControl: "max-age=86400",
       ContentEncoding: "gzip",
       ACL: "public-read",
-    });
+    }));
     return result;
   } catch (err) {
     throw new Error(`Upload to S3 failed: ${err}`);
   }
+}
+
+interface ArticlesResponse {
+  items: any[];
 }
 
 async function fetchArticles(oldArticlesArg: AggregatedData): Promise<Article[]> {
@@ -180,6 +187,7 @@ async function fetchArticles(oldArticlesArg: AggregatedData): Promise<Article[]>
 }
 
 async function fetchMarkdowns(oldMarkdowns: Markdowns = { hashes: {} }): Promise<Markdowns> {
+  console.log("Fetching markdowns");
   const markdownResults = await Promise.all(
     Object.entries(markdownUrls).map(async ([name, url]) => {
       try {
@@ -189,10 +197,11 @@ async function fetchMarkdowns(oldMarkdowns: Markdowns = { hashes: {} }): Promise
 
         if (currHash === oldHash) {
           console.log(`Returning old markdown content for ${name} as it hasn't changed`);
-          return { [name]: oldMarkdowns[name] };
+          return { [name]: oldMarkdowns[name], hashes: { [name]: currHash } };
         } else {
           return {
             [name]: md.render(response.data),
+            hashes: { [name]: currHash }
           };
         }
       } catch (error) {
@@ -201,9 +210,9 @@ async function fetchMarkdowns(oldMarkdowns: Markdowns = { hashes: {} }): Promise
     })
   );
 
-  return markdownResults.reduce(
-    (acc, curr) => ({ ...acc, ...curr }),
-    { hashes: {} } as Markdowns
+  return markdownResults.reduce<Markdowns>(
+    (acc, curr) => ({ ...acc, ...curr, hashes: { ...acc.hashes, ...curr.hashes } }),
+    { hashes: {} }
   );
 }
 
@@ -275,6 +284,14 @@ export async function handler(
       JSON.stringify(oldData.markdowns) === JSON.stringify(data.markdowns)
     ) {
       callback(null, "success - no changes");
+      return;
+    }
+
+    if (context === "local") {
+      console.log("Local mode, not uploading to S3");
+      // write to file
+      const json = JSON.stringify(data, null, 2);
+      await writeFile("data.json", json);
       return;
     }
 

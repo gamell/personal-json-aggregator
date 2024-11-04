@@ -37,9 +37,16 @@ jspm_packages
 .node_repl_history
 
 dist/**
+build/**
 
 .DS_Store
 
 .keys.json
 
+# TypeScript
+*.tsbuildinfo
+dist/
+
 build
+bun.lockb
+build.zip
